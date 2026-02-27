@@ -45,12 +45,48 @@ This is phase 1 of the project: scaffolding only. Install dependencies and start
 
 ### Agent
 
-```bash
+The agent process is a small FastAPI server that also manages background tasks such as
+listening to Twitch chat.  Before starting, set the following environment variables
+(as appropriate for your stream/channel):
+
+- `TWITCH_OAUTH_TOKEN` – OAuth token for the bot account (``oauth:...`` format)
+- `TWITCH_NICK` – the Twitch username of the bot
+- `TWITCH_CHANNEL` – the channel to join (without `#`)
+- `CHAT_KEYWORDS` – comma-separated list of words/phrases to watch for in chat
+- `CHAT_FREQ_THRESHOLD` – number of messages in 60s required to classify as spam
+- `WEBSOCKET_URL` – address of the server websocket endpoint (defaults to
+  `http://localhost:3001`)
+- `AUDIO_THRESHOLD` – RMS amplitude (0.0–1.0) above which an `audio_spike`
+  event is generated (default `0.1`).
+- `AUDIO_SAMPLERATE` – sample rate for the microphone input (default
+  `44100`).
+- `AUDIO_BLOCKSIZE` – frame size used when computing RMS (default `1024`).
+
+Example setup (Windows):
+
+```powershell
 cd agent
 python -m venv venv
-source venv/bin/activate  # or .\\venv\\Scripts\\activate on Windows
+.\venv\Scripts\activate
+set TWITCH_OAUTH_TOKEN=oauth:yourtokenhere
+set TWITCH_NICK=yourbotname
+set TWITCH_CHANNEL=yourchannel
+set CHAT_KEYWORDS=clip, hype, win
 pip install -r requirements.txt
 python main.py
+```
+
+With the configuration in place the chat listener will automatically connect and
+emit `hype_event` messages to the backend when keywords are spotted or the
+message rate exceeds the configured threshold.
+
+```bash
+# original snippet preserved for reference
+# cd agent
+# python -m venv venv
+# source venv/bin/activate  # or .\\venv\\Scripts\\activate on Windows
+# pip install -r requirements.txt
+# python main.py
 ```
 
 ### Server
