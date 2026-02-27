@@ -43,6 +43,17 @@ panther-ai-platform/
 
 This is phase 1 of the project: scaffolding only. Install dependencies and start each component individually.
 
+### Authentication (server)
+
+The server component now supports JWT-based authentication. Make sure to set a `JWT_SECRET` value in your `.env` file (see `/server/.env.example`).
+
+Endpoints:
+
+* `POST /api/auth/register` — create a new user; body: `{username,password,role?}` (`role` defaults to `mod`).
+* `POST /api/auth/login` — authenticate and receive `{token}`.
+
+All `/api/clips` routes are protected; include an `Authorization: Bearer <token>` header in requests.
+
 ### Agent
 
 The agent process is a small FastAPI server that also manages background tasks such as
@@ -112,6 +123,23 @@ cd server
 npm install
 npm run dev
 ```
+
+#### Production deployment
+
+The backend is ready for deployment on platforms like Heroku, Docker, or
+managed Node services:
+
+1. Supply configuration via environment variables (`PORT`, `MONGODB_URI`,
+   `JWT_SECRET`, optional `CORS_ORIGIN`). A sample `.env.example` lives at the
+   repo root.
+2. The server automatically falls back to the in-memory clip store if MongoDB
+   cannot be reached, which simplifies staging/demo environments.
+3. Logging is suppressed when `NODE_ENV=production`; only startup messages,
+   warnings, and errors are printed.
+4. CORS is enabled for the origin specified in `CORS_ORIGIN` (defaults to `*`).
+
+Example Dockerfile or `Procfile` can simply point to `node src/index.js` after
+installing dependencies.
 
 ### Web
 

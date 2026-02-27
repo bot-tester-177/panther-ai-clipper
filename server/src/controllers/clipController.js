@@ -1,9 +1,15 @@
 const Clip = require('../models/Clip');
+const { InMemoryClip } = require('../models/InMemoryStore');
+const { log, warn, error } = require('../utils');
+
+// Helper to get appropriate storage (MongoDB or in-memory)
+const getClipModel = (dbConnected) => dbConnected ? Clip : InMemoryClip;
 
 // Create a new clip
 exports.createClip = async (req, res) => {
   try {
     const { fileName, url, hypeScore, triggerType } = req.body;
+    const dbConnected = req.app.locals.dbConnected;
 
     // Validate required fields
     if (!fileName || !url || hypeScore === undefined || !triggerType) {
@@ -12,7 +18,8 @@ exports.createClip = async (req, res) => {
       });
     }
 
-    const clip = new Clip({
+    const ClipModel = getClipModel(dbConnected);
+    const clip = new ClipModel({
       fileName,
       url,
       hypeScore,
@@ -20,9 +27,20 @@ exports.createClip = async (req, res) => {
     });
 
     const savedClip = await clip.save();
+
+    // notify any realtime clients about the new clip
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('new_clip', savedClip);
+      }
+    } catch (emitErr) {
+      warn('Failed to emit new_clip event:', emitErr.message);
+    }
+
     res.status(201).json(savedClip);
   } catch (error) {
-    console.error('Error creating clip:', error);
+    error('Error creating clip:', error);
     res.status(500).json({
       error: 'Failed to create clip',
       details: error.message
@@ -33,10 +51,13 @@ exports.createClip = async (req, res) => {
 // Get all clips
 exports.getClips = async (req, res) => {
   try {
-    const clips = await Clip.find().sort({ createdAt: -1 });
+    const dbConnected = req.app.locals.dbConnected;
+    const ClipModel = getClipModel(dbConnected);
+
+    const clips = await ClipModel.find();
     res.json(clips);
   } catch (error) {
-    console.error('Error fetching clips:', error);
+    error('Error fetching clips:', error);
     res.status(500).json({
       error: 'Failed to fetch clips',
       details: error.message
@@ -48,15 +69,17 @@ exports.getClips = async (req, res) => {
 exports.getClipById = async (req, res) => {
   try {
     const { id } = req.params;
+    const dbConnected = req.app.locals.dbConnected;
+    const ClipModel = getClipModel(dbConnected);
 
-    const clip = await Clip.findById(id);
+    const clip = await ClipModel.findById(id);
     if (!clip) {
       return res.status(404).json({ error: 'Clip not found' });
     }
 
     res.json(clip);
   } catch (error) {
-    console.error('Error fetching clip:', error);
+    error('Error fetching clip:', error);
     res.status(500).json({
       error: 'Failed to fetch clip',
       details: error.message
@@ -68,8 +91,10 @@ exports.getClipById = async (req, res) => {
 exports.deleteClip = async (req, res) => {
   try {
     const { id } = req.params;
+    const dbConnected = req.app.locals.dbConnected;
+    const ClipModel = getClipModel(dbConnected);
 
-    const clip = await Clip.findByIdAndDelete(id);
+    const clip = await ClipModel.findByIdAndDelete(id);
     if (!clip) {
       return res.status(404).json({ error: 'Clip not found' });
     }
@@ -79,7 +104,7 @@ exports.deleteClip = async (req, res) => {
       deletedClip: clip
     });
   } catch (error) {
-    console.error('Error deleting clip:', error);
+    error('Error deleting clip:', error);
     res.status(500).json({
       error: 'Failed to delete clip',
       details: error.message

@@ -4,8 +4,8 @@ import tempfile
 import time
 from unittest import mock
 
-# make sure the agent package can be imported
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# make sure the agent package can be imported (add repo root to path)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import pytest
 
@@ -13,6 +13,11 @@ from agent.clip_manager import ClipManager
 
 
 def test_get_latest_clip(tmp_path):
+    # clip manager will try to instantiate an uploader during __init__, so
+    # satisfy its environment requirement even though we won't actually
+    # upload anything for this test.
+    os.environ["S3_BUCKET_NAME"] = "dummy"
+
     # create a couple of dummy files with different modification times
     file1 = tmp_path / "a.mp4"
     file1.write_text("foo")
@@ -23,6 +28,8 @@ def test_get_latest_clip(tmp_path):
     mgr = ClipManager(watch_dir=str(tmp_path))
     latest = mgr.get_latest_clip()
     assert latest.endswith("b.mp4")
+
+    del os.environ["S3_BUCKET_NAME"]
 
 
 @mock.patch("agent.clip_manager.S3Uploader")

@@ -3,8 +3,8 @@ import sys
 import tempfile
 from unittest import mock
 
-# ensure root of agent package is on path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# ensure repository root is on path so we can import the agent package
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import pytest
 

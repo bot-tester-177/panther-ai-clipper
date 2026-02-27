@@ -59,7 +59,7 @@ class ClipManager:
             return None
         return self.process_clip(clip_path, hype_score)
 
-    def process_clip(self, clip_path: str, hype_score: int = 0) -> dict:
+    def process_clip(self, clip_path: str, hype_score: int = 0, trigger_type: str | None = None) -> dict:
         """Upload *clip_path* and send metadata to the server.
 
         ``hype_score`` is included in the metadata payload. A timestamp is added
@@ -76,9 +76,18 @@ class ClipManager:
             "fileName": file_name,
             "url": url,
             "hypeScore": hype_score,
+            "triggerType": trigger_type,
             "timestamp": int(time.time()),
         }
+        # notify backend via websocket/REST (existing behavior)
         self._send_metadata(metadata)
+        # always POST to the API endpoint after upload completes
+        self._post_clip_api({
+            "fileName": file_name,
+            "url": url,
+            "hypeScore": hype_score,
+            "triggerType": trigger_type,
+        })
         return metadata
 
     def _send_metadata(self, metadata: dict):
@@ -121,6 +130,19 @@ class ClipManager:
             logger.info("sent clip metadata via REST %s", metadata)
         except Exception as exc:
             logger.warning("REST metadata send failed (%s): %s", url, exc)
+
+    def _post_clip_api(self, payload: dict):
+        """POST the clip record to the fixed backend API endpoint.
+
+        This uses the requests library and handles failures gracefully.
+        """
+        api_url = "http://localhost:3001/api/clips"
+        try:
+            resp = requests.post(api_url, json=payload, timeout=5)
+            resp.raise_for_status()
+            logger.info("posted clip to API %s", payload)
+        except Exception as exc:
+            logger.warning("failed to POST clip to %s: %s", api_url, exc)
 
 
 # module-level convenience functions

@@ -32,6 +32,17 @@ class Config:
         # directory where OBS saves replay files (optional)
         self.clip_dir = os.getenv("CLIP_DIR", "")
 
+        # hotkey combination used to manually trigger a clip event.  Uses the
+        # syntax expected by the "keyboard" library (e.g. "ctrl+shift+h").
+        # If this value is empty the hotkey listener will not start.
+        self.hotkey = os.getenv("HOTKEY", "")
+
+        # optional OBS websocket connection information used by OBSClient.  If
+        # provided the agent will attempt to call the replay buffer save
+        # command when the hype threshold fires.
+        self.obs_websocket_url = os.getenv("OBS_WEBSOCKET_URL", "")
+        self.obs_websocket_password = os.getenv("OBS_WEBSOCKET_PASSWORD", "")
+
         # audio detection settings
         # RMS threshold to trigger an "audio_spike" event (0.0-1.0)
         try:

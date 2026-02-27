@@ -1,43 +1,29 @@
 import { useEffect, useState } from 'react';
-import io from 'socket.io-client';
-import HypeMeter from '../components/HypeMeter';
+import { getSocket } from '../lib/socket';
+import RealTimeHypeMeter from '../components/RealTimeHypeMeter';
 import EventFeed from '../components/EventFeed';
 import SettingsPanel from '../components/SettingsPanel';
 
-let socket;
-
+// dashboard still keeps track of threshold so the settings panel can update it
 export default function Dashboard() {
-  const [hype, setHype] = useState(0);
   const [events, setEvents] = useState([]);
   const [threshold, setThreshold] = useState(50);
 
   useEffect(() => {
-    // only create socket once
-    if (!socket) {
-      socket = io(); // connects to same origin by default
-    }
-
-    socket.on('hypeUpdate', (value) => {
-      setHype(value);
-    });
-
-    socket.on('thresholdUpdate', (newThresh) => {
-      setThreshold(newThresh);
-    });
+    const socket = getSocket();
 
     socket.on('event', (evt) => {
       setEvents((prev) => [evt, ...prev].slice(0, 50));
     });
 
     return () => {
-      socket.off('hypeUpdate');
       socket.off('event');
     };
   }, []);
 
   const handleThresholdChange = (newThreshold) => {
     setThreshold(newThreshold);
-    socket?.emit('thresholdChange', newThreshold);
+    getSocket().emit('thresholdChange', newThreshold);
   };
 
   return (
@@ -45,7 +31,8 @@ export default function Dashboard() {
       <h1 className="text-3xl mb-4">Live Hype Dashboard</h1>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
-          <HypeMeter value={hype} threshold={threshold} />
+          {/* meter handles its own live socket connection */}
+          <RealTimeHypeMeter threshold={threshold} />
           <EventFeed events={events} />
           <div className="mt-4">
             <h2 className="text-xl mb-2">Debug / emit test events</h2>
@@ -54,7 +41,7 @@ export default function Dashboard() {
                 <button
                   key={type}
                   className="px-3 py-1 bg-cyber-cyan rounded hover:bg-cyber-pink"
-                  onClick={() => socket.emit('hype_event', { type })}
+                  onClick={() => getSocket().emit('hype_event', { type })}
                 >
                   {type}
                 </button>
