@@ -46,7 +46,7 @@ This is phase 1 of the project: scaffolding only. Install dependencies and start
 ### Agent
 
 The agent process is a small FastAPI server that also manages background tasks such as
-listening to Twitch chat.  Before starting, set the following environment variables
+listening to Twitch chat and handling OBS replay clips.  Before starting, set the following environment variables
 (as appropriate for your stream/channel):
 
 - `TWITCH_OAUTH_TOKEN` – OAuth token for the bot account (``oauth:...`` format)
@@ -56,11 +56,27 @@ listening to Twitch chat.  Before starting, set the following environment variab
 - `CHAT_FREQ_THRESHOLD` – number of messages in 60s required to classify as spam
 - `WEBSOCKET_URL` – address of the server websocket endpoint (defaults to
   `http://localhost:3001`)
+- `CLIP_DIR` – directory where OBS saves replay buffer files (optional)
+
+Audio-related variables remain the same:
+
 - `AUDIO_THRESHOLD` – RMS amplitude (0.0–1.0) above which an `audio_spike`
   event is generated (default `0.1`).
 - `AUDIO_SAMPLERATE` – sample rate for the microphone input (default
   `44100`).
 - `AUDIO_BLOCKSIZE` – frame size used when computing RMS (default `1024`).
+
+Additionally, for uploading clips to S3-compatible storage set:
+
+- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` – credentials for the bucket
+- `S3_BUCKET_NAME` – the target bucket name
+- `S3_ENDPOINT_URL` – (optional) custom endpoint for R2 or other providers
+
+The agent exposes the following modules for clip handling:
+
+- ``storage/uploader.py`` – encapsulates boto3 upload logic
+- ``clip_manager.py`` – locates latest clip, uploads it, and notifies the backend
+- ``obs_client.py`` – stub OBS integration that delegates to clip_manager
 
 Example setup (Windows):
 
@@ -104,6 +120,15 @@ cd web
 npm install
 npm run dev
 ```
+
+Once the web server is running (default port 3000) you can visit `/dashboard` to open the new Live Hype Dashboard. It uses Socket.io to talk to the backend and includes:
+
+- a real-time hype meter
+- an event feed showing incoming hype events
+- a settings panel with a threshold slider that syncs with the server
+- debug buttons for generating sample hype events
+
+Make sure the server (port 3001) is started before connecting.
 
 Further development will add actual logic and inter-component communication.
 

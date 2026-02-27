@@ -1,15 +1,30 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const mongoose = require('mongoose');
 
 // services
 const { HypeEngine } = require('./services');
 
+// routes
+const clipRoutes = require('./routes/clipRoutes');
+
 const app = express();
 const port = process.env.PORT || 3001;
 
+// middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // create http server so socket.io can attach
 const server = http.createServer(app);
+
+// connect to MongoDB
+const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/panther-clips';
+mongoose.connect(mongoUri)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // initialize websocket server
 const io = new Server(server, {
@@ -35,6 +50,10 @@ hype.on('trigger_clip', ({ score }) => {
 io.on('connection', (socket) => {
   console.log('client connected:', socket.id);
 
+  // send current hype/threshold to new client
+  socket.emit('hypeUpdate', hype.score || 0);
+  socket.emit('thresholdUpdate', hype.threshold);
+
   // basic text message example
   socket.on('message', (msg) => {
     console.log('received message:', msg);
@@ -53,10 +72,24 @@ io.on('connection', (socket) => {
       type = payload;
     }
 
+    // broadcast event to everyone (for the feed)
+    const evt = { type, timestamp: Date.now(), detail: payload.detail || '' };
+    io.emit('event', evt);
+
     const { score, triggered } = hype.addEvent(type);
     if (triggered) {
+      io.emit('hypeUpdate', score); // notify all of new score
       socket.emit('hype_ack', { triggered: true, score });
+    } else {
+      // update metrics for everyone anyway
+      io.emit('hypeUpdate', score);
     }
+  });
+
+  socket.on('thresholdChange', (newThreshold) => {
+    console.log('threshold change requested by', socket.id, newThreshold);
+    hype.threshold = Number(newThreshold) || hype.threshold;
+    io.emit('thresholdUpdate', hype.threshold);
   });
 
   socket.on('disconnect', () => {
@@ -65,9 +98,7 @@ io.on('connection', (socket) => {
 });
 
 // HTTP routes
-// Future route imports
-// const routes = require('./routes');
-// app.use('/api', routes(app));
+app.use('/api/clips', clipRoutes);
 
 // health check (prefixed with /api for consistency)
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));

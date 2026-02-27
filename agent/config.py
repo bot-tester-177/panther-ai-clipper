@@ -29,6 +29,9 @@ class Config:
         # websocket server url the listener should connect to
         self.websocket_url = os.getenv("WEBSOCKET_URL", "http://localhost:3001")
 
+        # directory where OBS saves replay files (optional)
+        self.clip_dir = os.getenv("CLIP_DIR", "")
+
         # audio detection settings
         # RMS threshold to trigger an "audio_spike" event (0.0-1.0)
         try:
