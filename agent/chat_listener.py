@@ -22,12 +22,16 @@ class ChatListener:
     * Keep a sliding window of messages to detect "chat spam" events
     * Scan each message for keywords defined in the configuration
     * Emit events to the server via a socket.io websocket connection
+
+    Detection events are only emitted when streaming is active.  An optional
+    :class:`StreamingStateManager` can be provided; if present the listener will
+    check ``streaming_state_mgr.is_streaming`` before sending anything.
     """
 
     IRCSERVER = "irc.chat.twitch.tv"
     IRCPORT = 6667
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, streaming_state_mgr=None):
         self.config = config
         self._sock = None
         self._running = False
@@ -37,6 +41,8 @@ class ChatListener:
 
         # socket.io client to talk to the WebSocket server
         self._sio = socketio.Client()
+        # optional reference used to gate event emission
+        self._streaming_state_mgr = streaming_state_mgr
 
     def _connect_ws(self):
         try:
@@ -46,6 +52,11 @@ class ChatListener:
             logger.warning("failed to connect websocket client: %s", exc)
 
     def _emit_event(self, event_type: str, data=None):
+        # block events when not streaming if a state manager is provided
+        if self._streaming_state_mgr and not self._streaming_state_mgr.is_streaming:
+            logger.debug("stream not active, dropping chat event %s", event_type)
+            return
+
         if not self._sio.connected:
             # try to reconnect once
             self._connect_ws()
@@ -140,12 +151,12 @@ class ChatListener:
 # convenience entrypoint for the rest of the agent
 
 
-def start_listener():
+def start_listener(streaming_state_mgr=None):
     cfg = Config.from_env()
     if not cfg.twitch_oauth_token or not cfg.twitch_nick or not cfg.twitch_channel:
         logger.warning("insufficient twitch configuration, chat listener will not start")
         return None
-    listener = ChatListener(cfg)
+    listener = ChatListener(cfg, streaming_state_mgr=streaming_state_mgr)
     listener.start()
     return listener
 

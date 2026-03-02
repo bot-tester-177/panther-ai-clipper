@@ -19,13 +19,18 @@ class AudioDetector:
     input device in a background thread.  RMS amplitude is computed for each
     block of samples; if the level exceeds ``config.audio_threshold`` an
     ``audio_spike`` event is sent to the websocket server.
+
+    Emission of events is gated by an optional
+    :class:`StreamingStateManager`.  When provided, the detector will drop
+    spikes while not streaming.
     """
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, streaming_state_mgr=None):
         self.config = config
         self._sio = socketio.Client()
         self._running = False
         self.stream = None
+        self._streaming_state_mgr = streaming_state_mgr
 
     def _connect_ws(self):
         try:
@@ -35,6 +40,12 @@ class AudioDetector:
             logger.warning("failed to connect websocket client: %s", exc)
 
     def _emit_event(self, event_type: str, data=None):
+        # do nothing if we have a streaming state manager that reports not
+        # streaming
+        if self._streaming_state_mgr and not self._streaming_state_mgr.is_streaming:
+            logger.debug("stream not active, dropping audio event %s", event_type)
+            return
+
         if not self._sio.connected:
             # try to reconnect once
             self._connect_ws()
@@ -94,12 +105,12 @@ class AudioDetector:
 
 # convenience entrypoint for the rest of the agent
 
-def start_detector():
+def start_detector(streaming_state_mgr=None):
     cfg = Config.from_env()
     # if threshold is 0 or negative, treat as disabled
     if cfg.audio_threshold <= 0:
         logger.warning("audio threshold disabled or not configured, detector will not start")
         return None
-    detector = AudioDetector(cfg)
+    detector = AudioDetector(cfg, streaming_state_mgr=streaming_state_mgr)
     detector.start()
     return detector

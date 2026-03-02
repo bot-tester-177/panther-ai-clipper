@@ -16,12 +16,16 @@ class HotkeyListener:
     The hotkey string comes from ``Config.hotkey`` and should use the same
     syntax as ``keyboard.add_hotkey`` (e.g. "ctrl+alt+h").  When the hotkey is
     pressed a ``manual_trigger`` event is sent to the backend via websocket.
+
+    The listener will only forward hotkey presses while streaming is active if
+    a :class:`StreamingStateManager` is supplied.
     """
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, streaming_state_mgr=None):
         self.config = config
         self._sio = socketio.Client()
         self._running = False
+        self._streaming_state_mgr = streaming_state_mgr
 
     def _connect_ws(self):
         try:
@@ -31,6 +35,10 @@ class HotkeyListener:
             logger.warning("failed to connect websocket client: %s", exc)
 
     def _emit_event(self, event_type: str):
+        if self._streaming_state_mgr and not self._streaming_state_mgr.is_streaming:
+            logger.debug("stream not active, dropping hotkey event %s", event_type)
+            return
+
         if not self._sio.connected:
             self._connect_ws()
         try:
@@ -79,8 +87,8 @@ class HotkeyListener:
         self._running = False
 
 
-def start_hotkey():
+def start_hotkey(streaming_state_mgr=None):
     cfg = Config.from_env()
-    listener = HotkeyListener(cfg)
+    listener = HotkeyListener(cfg, streaming_state_mgr=streaming_state_mgr)
     listener.start()
     return listener

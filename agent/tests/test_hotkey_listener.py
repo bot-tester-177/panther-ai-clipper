@@ -9,6 +9,7 @@ import pytest
 
 from agent.hotkey_listener import HotkeyListener
 from agent.config import Config
+from agent.streaming_state_manager import StreamingStateManager
 
 
 def test_hotkey_configuration():
@@ -23,6 +24,10 @@ def test_start_keyboard_listener_registers_hotkey(monkeypatch):
     cfg = Config.from_env()
     listener = HotkeyListener(cfg)
     listener._connect_ws = lambda: None  # avoid real socket call
+    # simulate streaming state manager
+    fake_mgr = mock.Mock()
+    fake_mgr.is_streaming = True
+    listener._streaming_state_mgr = fake_mgr
 
     fake_keyboard = mock.Mock()
     # ensure the import statement in the module will pick up our fake
@@ -37,4 +42,19 @@ def test_start_keyboard_listener_registers_hotkey(monkeypatch):
     cb()
     listener._emit_event.assert_called_with('manual_trigger')
 
+    del os.environ["HOTKEY"]
+
+
+def test_hotkey_dropped_when_not_streaming():
+    os.environ["HOTKEY"] = "ctrl+h"
+    cfg = Config.from_env()
+    listener = HotkeyListener(cfg)
+    listener._connect_ws = lambda: None
+    fake_mgr = mock.Mock()
+    fake_mgr.is_streaming = False
+    listener._streaming_state_mgr = fake_mgr
+    listener._sio = mock.Mock()
+
+    listener._emit_event('manual_trigger')
+    listener._sio.emit.assert_not_called()
     del os.environ["HOTKEY"]
